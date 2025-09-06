@@ -1,8 +1,8 @@
 # utils/cpuidle-info.c:193: error: undefined reference to 'cpufreq_cpu_exists'
 # investigate aarch64
-%define _binaries_in_noarch_packages_terminate_build 0
+%global _binaries_in_noarch_packages_terminate_build 0
 #end
-%define _disable_ld_no_undefined 1
+%global _disable_ld_no_undefined 1
 
 %ifarch %{aarch64}
 # FIXME this is a workaround for some debug files being created
@@ -21,8 +21,8 @@
 ## yes , including ftlo . O3 and whatever else
 
 # Disable useless debug rpms as we generate our own debug package
-%define _enable_debug_packages %{nil}
-%define debug_package %{nil}
+%global _enable_debug_packages %{nil}
+%global debug_package %{nil}
 %global __debug_package %{nil}
 %global __debug_install_post %{nil}
 %global _build_id_links none
@@ -62,7 +62,7 @@
 # compose tar.xz name and release
 %define kernelversion 6
 %define patchlevel 16
-%define sublevel 0
+%define sublevel 5
 #define relc 0
 
 # Having different top level names for packges means that you have to remove
