@@ -6,5 +6,5 @@ sources:
   tp_smapi-0.45.tgz: ced1ea185dc6acdf0dd9f2a51cd75fc14a19fa82
   v1.14.15.tar.gz: 32928095e379eb486aa2ea2a828a2d752ac35a45
   linux-7.1.tar.xz: 8ac8dc97cd273a5ad7a3bed4f1be71c1b707a8e6
-  610.43.02.tar.gz: c34e52ca9c296dfa8673aa69e8823a8039a63fe4
-  patch-7.1.4.xz: 1349974440a56d674951e724951bd1d34f71ddb4
+  610.43.03.tar.gz: 28ea3a14b1eb9dc6f71b98a2b20471de048ef8b0
+  patch-7.1.5.xz: 925b289650aeff62171436fe8ba86a417ae7ae47

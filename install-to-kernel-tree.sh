@@ -663,13 +663,20 @@ NV_CONFTEST_CMD := /bin/sh \$(NV_CONFTEST_SCRIPT) \\
 # compiler_types.h is added explicitly (kbuild normally adds it via
 # KBUILD_CFLAGS, but we cannot use KBUILD_CFLAGS wholesale because it
 # contains -Werror which would break conftest's detection logic).
+#
+# -fms-extensions / -fms-anonymous-structs: required so anonymous MS struct
+# members (e.g. struct filename { struct __filename_head; ... }) parse
+# correctly. Clang 23's CONFIG_CC_MS_EXTENSIONS is -fms-anonymous-structs;
+# older toolchains used -fms-extensions. Without these, conftest compile
+# tests fail inside linux/fs.h (sizeof(struct filename) static_assert) and
+# feature detection produces inverted/wrong results.
 NV_CONFTEST_CFLAGS_ABS_SRCTREE := \$(abspath \$(srctree))
 NV_CONFTEST_LINUXINCLUDE := \$(subst ./,\$(NV_CONFTEST_CFLAGS_ABS_SRCTREE)/,\$(LINUXINCLUDE))
 NV_CONFTEST_CFLAGS = -O2 -D__KERNEL__ \\
   -DKBUILD_BASENAME=\\\"conftest\\\" -DKBUILD_MODNAME=\\\"conftest\\\" \\
   \$(NOSTDINC_FLAGS) \$(NV_CONFTEST_LINUXINCLUDE) \\
   -include \$(NV_CONFTEST_CFLAGS_ABS_SRCTREE)/include/linux/compiler_types.h \\
-  \$(filter -std=% -fshort-wchar -funsigned-char -fno-common -fno-PIE -fno-pie -fms-extensions -mfentry -fcf-protection=% -DCC_USING_FENTRY,\$(KBUILD_CFLAGS)) \\
+  \$(filter -std=% -fshort-wchar -funsigned-char -fno-common -fno-PIE -fno-pie -fms-extensions -fms-anonymous-structs -mfentry -fcf-protection=% -DCC_USING_FENTRY,\$(KBUILD_CFLAGS)) \\
   -I\$(abspath \$(obj)) \\
   -I\$(abspath \$(src)/kernel-open) \\
   -Wno-implicit-function-declaration -Wno-strict-prototypes \\

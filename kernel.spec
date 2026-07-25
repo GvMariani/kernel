@@ -90,7 +90,7 @@
 # compose tar.xz name and release
 %define kernelversion 7
 %define patchlevel 1
-%define sublevel 4
+%define sublevel 5
 #define relc 7
 
 # Having different top level names for packges means that you have to remove
@@ -292,6 +292,9 @@ Patch52:	http://crazy.dev.frugalware.org/smpboot-no-stack-protector-for-gcc10.pa
 Patch55:	linux-5.16-clang-no-attribute-symver.patch
 Patch60:	linux-6.18-clang.patch
 Patch61:	linux-6.19-acpi-clang.patch
+# Clang 23: compressed boot PIE link fails with "Unexpected run-time relocations (.rela)"
+# because this subdir resets KBUILD_CFLAGS and loses main x86 -fno-jump-tables.
+Patch62:	linux-7.1-x86-boot-compressed-no-jump-tables.patch
 
 ### Additional hardware support
 ### TV tuners:
@@ -341,7 +344,7 @@ Source1020:	https://github.com/Numerio/Nexus/archive/refs/heads/main.tar.gz#/nex
 Patch1021:	nexus-compile.patch
 
 # Nvidia GPU driver
-%define nvidia_version 610.43.02
+%define nvidia_version 610.43.03
 Source1030:	https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/%{nvidia_version}.tar.gz
 # Script to internalize nvidia modules
 Source1031:	install-to-kernel-tree.sh
@@ -1546,6 +1549,11 @@ SaveDevel() {
 		rm -rf $TempDevelRoot/arch/$i
 	done
 
+%if %{with bpftool}
+# Needed by systemd build
+	tools/bpf/bpftool/bootstrap/bpftool btf dump file vmlinux format c >$TempDevelRoot/include/vmlinux.h
+%endif
+
 # Clean the scripts tree, and make sure everything is ok (sanity check)
 # running prepare+scripts (tree was already "prepared" in build)
 	cd $TempDevelRoot >/dev/null
@@ -1612,6 +1620,7 @@ $DevelRoot/include/ufs
 $DevelRoot/include/vdso
 $DevelRoot/include/video
 $DevelRoot/include/xen
+$DevelRoot/include/vmlinux.h
 $DevelRoot/init
 $DevelRoot/io_uring
 $DevelRoot/ipc
@@ -1844,6 +1853,12 @@ done
 unset ARCH
 make mrproper
 
+# Build bpftool first so SaveDevel can use it
+%if %{with bpftool}
+%make_build -C tools/bpf/bpftool CC=%{__cc} HOSTCC=%{__cc} ARCH=%{target_arch} LLVM=1 DESTDIR="%{temp_root}" V=0 VERBOSE=0
+%make_install -C tools/bpf/bpftool DESTDIR="%{temp_root}" prefix=%{_prefix} bash_compdir=%{_sysconfdir}/bash_completion.d/ mandir=%{_mandir} ARCH=%{target_arch} LLVM=1 install V=0 VERBOSE=0
+%endif
+
 # (tpg) build kernels for all flavours
 for flavour in %{kernel_flavours}; do
 	PrepareKernel ${flavour} ${flavour}-%{release}%{disttag}
@@ -1883,11 +1898,6 @@ mkdir -p %{temp_root}%{_bindir} %{temp_root}%{_mandir}/man8
 mkdir -p %{temp_root}%{_bindir} %{temp_root}%{_mandir}/man8
 %make_install -C tools/power/x86/turbostat DESTDIR="%{temp_root}" V=0 VERBOSE=0
 %endif
-%endif
-
-%if %{with bpftool}
-%make_build -C tools/bpf/bpftool CC=%{__cc} HOSTCC=%{__cc} ARCH=%{target_arch} LLVM=1 DESTDIR="%{temp_root}" V=0 VERBOSE=0
-%make_install -C tools/bpf/bpftool DESTDIR="%{temp_root}" prefix=%{_prefix} bash_compdir=%{_sysconfdir}/bash_completion.d/ mandir=%{_mandir} ARCH=%{target_arch} LLVM=1 install V=0 VERBOSE=0
 %endif
 
 %if %{with perf}
