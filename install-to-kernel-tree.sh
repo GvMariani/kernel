@@ -1034,6 +1034,16 @@ fi
 echo "nvidia-modeset-y := \$(nvidia-modeset-if-y) \$(nvidia-modeset-core-y) \$(nvidia-modeset-cxx-y) \$(nvidia-modeset-shaders-y) g_nv_kms_nvid_string.o"
 echo
 
+# C++ vtables/COMDAT groups become invalid after ld -r (multiple groups
+# share a merged .rodata). GNU objcopy then fails BTF embedding with
+# "invalid entry in group" / "corrupted group section" — which is the
+# aarch64 build failure (OBJCOPY=objcopy). NVIDIA's own modeset Makefile
+# passes --force-group-allocation for the same reason (discards groups on
+# relocatable links). Kbuild applies LDFLAGS_$(@F) via ld_flags.
+echo "# Discard C++ COMDAT groups on relocatable link (see NVIDIA --force-group-allocation)"
+echo "LDFLAGS_nvidia-modeset.o := --force-group-allocation"
+echo
+
 # NV_KMS ID string generation
 cat << NV_KMS_NVID_EOF
 # Generated version identification string for nvidia-modeset.ko
