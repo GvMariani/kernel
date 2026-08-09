@@ -1,30 +1,102 @@
-diff -up linux-7.0/drivers/nexus/nexus_core.c.omv~ linux-7.0/drivers/nexus/nexus_core.c
---- linux-7.0/drivers/nexus/nexus_core.c.omv~	2026-04-19 19:38:01.566810321 +0200
-+++ linux-7.0/drivers/nexus/nexus_core.c	2026-04-19 19:39:18.332054133 +0200
-@@ -30,6 +30,9 @@ static int major = -1;
- static struct cdev nexus_cdev;
- static struct class *nexus_class = NULL;
- 
-+struct nexus_thread* find_thread(struct nexus_team *team, const char *name);
-+struct nexus_thread* find_thread_by_id(struct nexus_team *team, int32_t pid);
-+
- DEFINE_MUTEX(nexus_main_lock);
- HLIST_HEAD(nexus_teams);
- 
-@@ -79,7 +82,7 @@ static void nexus_thread_exit_work(struc
- 	mutex_unlock(&nexus_main_lock);
+diff -up linux/drivers/nexus/nexus_core.c.omv~ linux/drivers/nexus/nexus_core.c
+--- linux/drivers/nexus/nexus_core.c.omv~	2026-08-08 15:20:00.000000000 +0200
++++ linux/drivers/nexus/nexus_core.c	2026-08-08 15:20:00.000000000 +0200
+@@ -133,7 +133,7 @@ void nexus_unregister_team_exit(nexus_te
  }
+ EXPORT_SYMBOL(nexus_unregister_team_exit);
  
 -struct nexus_team* nexus_team_init()
 +struct nexus_team* nexus_team_init(void)
  {
- 	struct nexus_team* team = kzalloc(sizeof(struct nexus_team), GFP_KERNEL);
- 	if (team != NULL) {
-@@ -759,7 +762,6 @@ static int nexus_open(struct inode *nodp
+ 	struct nexus_team *t = idr_find(&nexus_teams_idr, current->tgid);
+ 	if (t != NULL) {
+--- linux/drivers/nexus/index.c.omv~	2026-08-07 09:11:04.000000000 +0200
++++ linux/drivers/nexus/index.c	2026-08-08 16:43:18.309250980 +0200
+@@ -129,22 +129,35 @@ static int ensure_dir(const char *path)
+ 		return ret;
  
- static int nexus_release(struct inode *nodp, struct file *filp)
- {
--	struct nexus_team *team = filp->private_data;
- 	mutex_lock(&nexus_main_lock);
- 	nexus_team_destroy((struct nexus_team*)filp->private_data);
- 	mutex_unlock(&nexus_main_lock);
+ 	inode_lock(d_inode(parent_path.dentry));
+-	child = lookup_one_len(basename, parent_path.dentry, strlen(basename));
+-	if (IS_ERR(child)) {
+-		ret = PTR_ERR(child);
+-		goto out_unlock;
+-	}
++	{
++		struct qstr q = QSTR_INIT(basename, strlen(basename));
++		struct dentry *created;
++
++		child = lookup_one(&nop_mnt_idmap, &q, parent_path.dentry);
++		if (IS_ERR(child)) {
++			ret = PTR_ERR(child);
++			goto out_unlock;
++		}
+ 
+-	if (d_is_positive(child)) {
++		if (d_is_positive(child)) {
++			ret = 0;
++			dput(child);
++			goto out_unlock;
++		}
++
++		created = vfs_mkdir(&nop_mnt_idmap, d_inode(parent_path.dentry),
++				    child, 0755, NULL);
++		if (IS_ERR(created)) {
++			ret = PTR_ERR(created);
++			dput(child);
++			goto out_unlock;
++		}
++		if (created != child)
++			dput(child);
++		dput(created);
+ 		ret = 0;
+-		dput(child);
+-		goto out_unlock;
+ 	}
+ 
+-	ret = vfs_mkdir(&nop_mnt_idmap, d_inode(parent_path.dentry),
+-			child, 0755);
+-	dput(child);
+-
+ out_unlock:
+ 	inode_unlock(d_inode(parent_path.dentry));
+ 	path_put(&parent_path);
+@@ -324,8 +337,12 @@ long nexus_index_ioctl_create(unsigned l
+ 
+ 	inode_lock(d_inode(parent_path.dentry));
+ 
+-	marker_dentry = lookup_one_len(req.name, parent_path.dentry,
+-				       strlen(req.name));
++	{
++		struct qstr q = QSTR_INIT(req.name, strlen(req.name));
++
++		marker_dentry = lookup_one(&nop_mnt_idmap, &q,
++					   parent_path.dentry);
++	}
+ 	if (IS_ERR(marker_dentry)) {
+ 		ret = PTR_ERR(marker_dentry);
+ 		goto out_parent_unlock;
+@@ -336,8 +353,7 @@ long nexus_index_ioctl_create(unsigned l
+ 		goto out_dput;
+ 	}
+ 
+-	ret = vfs_create(&nop_mnt_idmap, d_inode(parent_path.dentry),
+-			 marker_dentry, 0644, false);
++	ret = vfs_create(&nop_mnt_idmap, marker_dentry, 0644, NULL);
+ 	if (ret)
+ 		goto out_dput;
+ 
+@@ -403,8 +419,12 @@ long nexus_index_ioctl_remove(unsigned l
+ 
+ 	inode_lock(d_inode(parent_path.dentry));
+ 
+-	marker_dentry = lookup_one_len(req.name, parent_path.dentry,
+-				       strlen(req.name));
++	{
++		struct qstr q = QSTR_INIT(req.name, strlen(req.name));
++
++		marker_dentry = lookup_one(&nop_mnt_idmap, &q,
++					   parent_path.dentry);
++	}
+ 	if (IS_ERR(marker_dentry)) {
+ 		ret = PTR_ERR(marker_dentry);
+ 		goto out_parent_unlock;

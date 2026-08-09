@@ -90,7 +90,7 @@
 # compose tar.xz name and release
 %define kernelversion 7
 %define patchlevel 1
-%define sublevel 5
+%define sublevel 7
 #define relc 7
 
 # Having different top level names for packges means that you have to remove
@@ -334,17 +334,17 @@ Source1009:	vbox-modules-6.15.patch
 
 # EVDI Extensible Virtual Display Interface
 # Needed by DisplayLink cruft
-%define evdi_version 1.14.15
+%define evdi_version 1.15.0
 Source1010:	https://github.com/DisplayLink/evdi/archive/refs/tags/v%{evdi_version}.tar.gz
 
 # Nexus -- BeOS like IPC, named semaphores, SHM, thread messaging, filesystem event notifications
 # https://github.com/Numerio/Nexus
 # https://v-os.dev/
-Source1020:	https://github.com/Numerio/Nexus/archive/refs/heads/main.tar.gz#/nexus-20260415.tar.gz
+Source1020:	https://github.com/Numerio/Nexus/archive/refs/heads/main.tar.gz#/nexus-20260807.tar.gz
 Patch1021:	nexus-compile.patch
 
 # Nvidia GPU driver
-%define nvidia_version 610.43.03
+%define nvidia_version 610.57.04
 Source1030:	https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/%{nvidia_version}.tar.gz
 # Script to internalize nvidia modules
 Source1031:	install-to-kernel-tree.sh
@@ -1055,11 +1055,23 @@ find drivers/media/tuners drivers/media/dvb-frontends -name "*.c" -o -name "*.h"
 mv evdi-%{evdi_version}/module drivers/gpu/drm/evdi
 rm -rf evdi-%{evdi_version}
 sed -i -e '/imagination/isource "drivers/gpu/drm/evdi/Kconfig"' drivers/gpu/drm/Kconfig
-# The dkms makefile is not really useful for a proper in-tree build
+# DKMS/out-of-tree Makefile is not usable in-tree. Keep the same objects as
+# upstream 1.15, plus conftest.sh → evdi_detect.h (EVDI_HAVE_* probes).
+# Do not build the kunit tests/ subtree.
 cat >drivers/gpu/drm/evdi/Makefile <<'EOF'
+ccflags-y += -include $(obj)/evdi_detect.h
+clean-files := evdi_detect.h evdi_detect.h.tmp
+
 evdi-y := evdi_platform_drv.o evdi_platform_dev.o evdi_sysfs.o evdi_modeset.o evdi_connector.o evdi_encoder.o evdi_drm_drv.o evdi_fb.o evdi_gem.o evdi_painter.o evdi_params.o evdi_cursor.o evdi_debug.o evdi_i2c.o
 evdi-$(CONFIG_COMPAT) += evdi_ioc32.o
 obj-$(CONFIG_DRM_EVDI) := evdi.o
+
+$(addprefix $(obj)/, $(evdi-y) evdi_ioc32.o): $(obj)/evdi_detect.h
+
+$(obj)/evdi_detect.h: $(src)/conftest.sh FORCE
+	$(Q)$(CONFIG_SHELL) $(src)/conftest.sh "$(CC)" $@.tmp \
+		$(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) -DMODULE
+	$(Q)cmp -s $@.tmp $@ 2>/dev/null && rm -f $@.tmp || mv $@.tmp $@
 EOF
 echo 'obj-$(CONFIG_DRM_EVDI) += evdi/' >>drivers/gpu/drm/Makefile
 %endif
@@ -1163,7 +1175,10 @@ sed -i -e 's,\$(VBOXPCI_DIR),drivers/pci/vboxpci/,g' drivers/pci/vboxpci/Makefil
 sed -i -e "s,^KERN_DIR.*,KERN_DIR := $(pwd)," drivers/pci/vboxpci/Makefile*
 echo 'obj-$(CONFIG_VBOXGUEST) += vboxpci/' >>drivers/pci/Makefile
 %endif
-patch -p1 -z .1005~ -b <%{S:1005}
+# VirtualBox 7.2+ hosts no longer call kvm_enable_virtualization() /
+# ASMCpuIdEx_EDX(); they open a dummy /dev/kvm instead.  The 7.0-era
+# SUPDrv-linux.c patch does not apply and is not needed.
+#patch -p1 -z .1005~ -b <%{S:1005}
 patch -p1 -z .1007~ -b <%{S:1007}
 #patch -p1 -z .1009~ -b <%{S:1009}
 %endif
