@@ -351,6 +351,8 @@ Source1031:	install-to-kernel-tree.sh
 # Documentation of the above
 Source1032:	CHANGES.md
 Source1033:	nvidia-symvers-location.patch
+# 610.57.04 of_gpio compat: gpio_device_get_chip() is not const
+Source1034:	nvidia-gpio-const.patch
 
 # Assorted fixes
 
@@ -977,6 +979,7 @@ rm -rf .git
 tar xf %{S:1030}
 cd open-gpu-kernel-modules-%{nvidia_version}
 patch -p1 -b -z .1033~ <%{S:1033}
+patch -p1 -b -z .1034~ <%{S:1034}
 cp %{S:1031} .
 chmod +x install-to-kernel-tree.sh
 ./install-to-kernel-tree.sh ${TOPDIR}
