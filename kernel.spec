@@ -2076,15 +2076,27 @@ description() {
 	echo $D
 }
 PERCENT='%%'
-DONE=""
+# Membership lookup — avoid grep -q in the per-module loop.
+# The old nested "for d in $DONE; echo | grep" is O(modules × dirs) and
+# with rpm xtrace it filled a 640MB log and timed out aarch64 ABF.
+declare -A MODPKG_DIR MODPKG_KO
+for _m in %{modules_subpackages}; do
+	if [[ "$_m" == *.ko ]]; then
+		MODPKG_KO["$_m"]=1
+	else
+		MODPKG_DIR["$_m"]=1
+	fi
+done
 for flavour in %{kernel_flavours}; do
+	unset DONE_PREFIX
+	declare -A DONE_PREFIX
 	while read d; do
 		M="$(basename $d)"
-		DN="$(echo $d |cut -b2-)"
+		DN="${d#.}"
 		# FIXME we need to skip subdirectories of already handled directories here
 		# No handling of kernel/drivers/comedi/drivers if kernel/drivers/comedi has already
 		# been taken care of
-		if echo " %{modules_subpackages} " |grep -q " ${M} "; then
+		if [[ -n "${MODPKG_DIR[$M]}" ]]; then
 			# Let's see if it's a group of modules (e.g. "all ISDN drivers") or
 			# an individual module that has its own directory (e.g. most filesystems,
 			# with paths like fs/jfs/jfs.ko)
@@ -2117,7 +2129,7 @@ ${PERCENT}files -n %{name}-${flavour}-modules-${M}
 EOF
 			fi
 			echo "${DN}" >>"$SP"
-			DONE="$DONE ${DN}"
+			DONE_PREFIX["$DN"]=1
 		else
 			echo "%%dir ${DN}" >>${TOP}/kernel_files.${flavour}
 		fi
@@ -2125,16 +2137,19 @@ EOF
 	while read f; do
 		M="$(basename $f)"
 		BN="$(echo $M |sed -e 's,\.ko.*,,')"
-		FN="$(echo $f |cut -b2-)"
+		FN="${f#.}"
+		# O(depth) parent walk instead of grepping every DONE prefix
+		p="$FN"
 		IS_DONE=false
-		for d in $DONE; do
-			if echo $FN |grep -q "^$d/"; then
+		while [[ "$p" == */* ]]; do
+			p="${p%/*}"
+			if [[ -n "${DONE_PREFIX[$p]}" ]]; then
 				IS_DONE=true
 				break
 			fi
 		done
 		$IS_DONE && continue
-		if echo " %{modules_subpackages} " |grep -q " ${BN}.ko "; then
+		if [[ -n "${MODPKG_KO[${BN}.ko]}" ]]; then
 			D="$(description $f) for the ${flavour} kernel"
 			SP="%{specpartsdir}/%{name}-${flavour}-modules-${BN}.specpart"
 			if ! [ -e "$SP" ]; then # Deal with e.g. net/can and drivers/can going together
