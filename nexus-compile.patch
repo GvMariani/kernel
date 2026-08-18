@@ -1,17 +1,6 @@
-diff -up linux/drivers/nexus/nexus_core.c.omv~ linux/drivers/nexus/nexus_core.c
---- linux/drivers/nexus/nexus_core.c.omv~	2026-08-08 15:20:00.000000000 +0200
-+++ linux/drivers/nexus/nexus_core.c	2026-08-08 15:20:00.000000000 +0200
-@@ -133,7 +133,7 @@ void nexus_unregister_team_exit(nexus_te
- }
- EXPORT_SYMBOL(nexus_unregister_team_exit);
- 
--struct nexus_team* nexus_team_init()
-+struct nexus_team* nexus_team_init(void)
- {
- 	struct nexus_team *t = idr_find(&nexus_teams_idr, current->tgid);
- 	if (t != NULL) {
---- linux/drivers/nexus/index.c.omv~	2026-08-07 09:11:04.000000000 +0200
-+++ linux/drivers/nexus/index.c	2026-08-08 16:43:18.309250980 +0200
+diff -upr linux/drivers/nexus/index.c linux/drivers/nexus/index.c
+--- linux/drivers/nexus/index.c	2026-08-17 17:59:11.000000000 +0200
++++ linux/drivers/nexus/index.c	2026-08-17 18:26:58.855888684 +0200
 @@ -129,22 +129,35 @@ static int ensure_dir(const char *path)
  		return ret;
  
@@ -100,3 +89,84 @@ diff -up linux/drivers/nexus/nexus_core.c.omv~ linux/drivers/nexus/nexus_core.c
  	if (IS_ERR(marker_dentry)) {
  		ret = PTR_ERR(marker_dentry);
  		goto out_parent_unlock;
+diff -upr linux/drivers/nexus/nexus_core.c linux/drivers/nexus/nexus_core.c
+--- linux/drivers/nexus/nexus_core.c	2026-08-17 17:59:11.000000000 +0200
++++ linux/drivers/nexus/nexus_core.c	2026-08-17 18:26:58.855827463 +0200
+@@ -16,6 +16,7 @@
+ #include <linux/rbtree.h>
+ #include <linux/kallsyms.h>
+ #include <linux/slab.h>
++#include <linux/string.h>
+ #include <linux/uaccess.h>
+ #include <linux/version.h>
+ #include <linux/signal.h>
+@@ -162,7 +163,7 @@ static struct nexus_team* nexus_team_ini
+ 			return NULL;
+ 		}
+ 
+-		strncpy(team->main_thread->name, "main", 4);
++		strscpy(team->main_thread->name, "main");
+ 		team->ports = RB_ROOT;
+ 		team->threads = RB_ROOT;
+ 
+@@ -176,7 +177,7 @@ static struct nexus_team* nexus_team_ini
+ 	return team;
+ }
+ 
+-struct nexus_team* nexus_team_init()
++struct nexus_team* nexus_team_init(void)
+ {
+ 	return nexus_team_init_for(current->tgid);
+ }
+diff -upr linux/drivers/nexus/port.c linux/drivers/nexus/port.c
+--- linux/drivers/nexus/port.c	2026-08-17 17:59:11.000000000 +0200
++++ linux/drivers/nexus/port.c	2026-08-17 18:26:58.856022315 +0200
+@@ -15,6 +15,7 @@
+ #include <linux/mutex.h>
+ #include <linux/rbtree.h>
+ #include <linux/slab.h>
++#include <linux/string.h>
+ #include <linux/uaccess.h>
+ #include <linux/wait.h>
+ 
+@@ -257,8 +258,7 @@ long nexus_get_next_port_for_team(unsign
+ 		req.info.capacity   = p->capacity;
+ 		req.info.queue_count = p->read_count;
+ 		req.info.total_count = p->total_count;
+-		strncpy(req.info.name, p->name, B_OS_NAME_LENGTH);
+-		req.info.name[B_OS_NAME_LENGTH - 1] = '\0';
++		strscpy(req.info.name, p->name);
+ 		req.ret = B_OK;
+ 		break;
+ 	}
+diff -upr linux/drivers/nexus/sem.c linux/drivers/nexus/sem.c
+--- linux/drivers/nexus/sem.c	2026-08-17 17:59:11.000000000 +0200
++++ linux/drivers/nexus/sem.c	2026-08-17 18:26:58.855939024 +0200
+@@ -11,6 +11,7 @@
+ #include <linux/sched/signal.h>
+ #include <linux/semaphore.h>
+ #include <linux/slab.h>
++#include <linux/string.h>
+ #include <linux/spinlock.h>
+ #include <linux/uaccess.h>
+ 
+@@ -365,8 +366,7 @@ static int nexus_get_sem_info(sem_id id,
+ 	}
+ 
+ 	info->sem = sem->id;
+-	strncpy(info->name, sem->name, B_OS_NAME_LENGTH);
+-	info->name[B_OS_NAME_LENGTH - 1] = '\0';
++	strscpy(info->name, sem->name);
+ 	info->count = sem->count;
+ 	info->team = sem->owner;
+ 	info->latest_holder = sem->latest_holder;
+@@ -390,8 +390,7 @@ static int nexus_get_next_sem_info(team_
+ 			continue;
+ 
+ 		out->info.sem = sem->id;
+-		strncpy(out->info.name, sem->name, B_OS_NAME_LENGTH);
+-		out->info.name[B_OS_NAME_LENGTH - 1] = '\0';
++		strscpy(out->info.name, sem->name);
+ 		out->info.count = sem->count;
+ 		out->info.team = sem->owner;
+ 		out->info.latest_holder = sem->latest_holder;

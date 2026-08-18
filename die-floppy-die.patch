@@ -17,9 +17,9 @@ diff --git a/drivers/block/floppy.c b/drivers/block/floppy.c
 index a08cda955285..e320e1e679cf 100644
 --- a/drivers/block/floppy.c
 +++ b/drivers/block/floppy.c
-@@ -4633,8 +4633,7 @@ static const struct pnp_device_id floppy_pnpids[] = {
- 	{"PNP0700", 0},
- 	{}
+@@ -5014,8 +5014,7 @@ static const struct pnp_device_id floppy_pnpids[] = {
+ 	{ .id = "PNP0700" },
+ 	{ }
  };
 -
 -MODULE_DEVICE_TABLE(pnp, floppy_pnpids);
