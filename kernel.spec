@@ -165,7 +165,7 @@
 # compose tar.xz name and release
 %define kernelversion 7
 %define patchlevel 2
-#define sublevel 7
+%define sublevel 0
 #define relc 7
 
 # Having different top level names for packges means that you have to remove
@@ -2209,6 +2209,13 @@ for flavour in %{kernel_flavours}; do
 	while read d; do
 		M="$(basename $d)"
 		DN="${d#.}"
+		# DTBs are already listed as a tree in CreateFiles(). Walking
+		# them here re-adds %dir entries (File listed twice) and
+		# basename-matches vendor dirs such as dtb/nvidia into
+		# kernel-*-modules-nvidia.
+		if [[ "$DN" == */dtb || "$DN" == */dtb/* ]]; then
+			continue
+		fi
 		# Skip subdirectories of a directory already claimed by a split
 		# (e.g. kernel/drivers/comedi/drivers after kernel/drivers/comedi).
 		p="$DN"
@@ -2260,7 +2267,7 @@ EOF
 		else
 			echo "%%dir ${DN}" >>${TOP}/kernel_files.${flavour}
 		fi
-	done < <(find .%{_modulesdir}/%{version}-${flavour}-%{release}%{disttag} -type d)
+	done < <(find .%{_modulesdir}/%{version}-${flavour}-%{release}%{disttag}/kernel -type d)
 	while read f; do
 		M="$(basename $f)"
 		BN="$(echo $M |sed -e 's,\.ko.*,,')"
