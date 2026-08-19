@@ -1314,6 +1314,22 @@ patch -p1 -z .2001~ -b <%{S:2001}
 %build
 %set_build_flags
 
+%if %{cross_compiling}
+# Host helpers (scripts/sign-file, kconfig, mrproper) must use native
+# headers and flags. Cross rpm flags leak target CFLAGS (-mabi=...)
+# and PKG_CONFIG_SYSROOT_DIR (target stdio.h) into HOSTCC/HOSTPKG_CONFIG.
+unset PKG_CONFIG_SYSROOT_DIR
+unset PKG_CONFIG_LIBDIR
+export HOSTCFLAGS="-O2 -std=gnu11"
+export HOSTCXXFLAGS="-O2"
+export HOSTLDFLAGS=""
+export CFLAGS=""
+export CXXFLAGS=""
+export LDFLAGS=""
+export CC=clang
+export CXX=clang++
+%endif
+
 ###
 ### Functions definitions needed to build kernel
 ###
@@ -1725,7 +1741,9 @@ $DevelRoot/include/ufs
 $DevelRoot/include/vdso
 $DevelRoot/include/video
 $DevelRoot/include/xen
+%if %{with bpftool}
 $DevelRoot/include/vmlinux.h
+%endif
 $DevelRoot/init
 $DevelRoot/io_uring
 $DevelRoot/ipc
@@ -2189,6 +2207,14 @@ for _m in %{modules_subpackages}; do
 		MODPKG_DIR["$_m"]="${_pkg:-$_m}"
 	fi
 done
+# Recreate flavour file lists and module specparts so a re-run of
+# %install does not duplicate %dir / module paths.
+for flavour in %{kernel_flavours}; do
+	kf=${TOP}/kernel_files.${flavour}
+	[ -f "$kf" ] || continue
+	grep -vE '^(%dir /lib/modules/|/lib/modules/.*/kernel)' "$kf" > "${kf}.tmp" && mv "${kf}.tmp" "$kf"
+done
+rm -f %{specpartsdir}/%{name}-*-modules-*.specpart
 modpkg_for_dir() {
 	local DN="$1" M suf
 	M="${DN##*/}"
