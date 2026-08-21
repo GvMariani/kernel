@@ -46,15 +46,32 @@
 
 %define target_arch %(echo %{_arch} | sed -e 's/mips.*/mips/' -e 's/arm.*/arm/' -e 's/aarch64/arm64/' -e 's/x86_64/x86/' -e 's/i.86/x86/' -e 's/znver1/x86/' -e 's/riscv.*/riscv/' -e 's/ppc.*/powerpc/' -e 's/loongarch64/loongarch/')
 
-# (tpg) define here per arch which kernel flavours you would like to build
-# we don't currently have gcc on loongarch64, enable all kernels when we do
+# Kernel flavours as bconds. rpm does not accept hyphens in bcond names,
+# so the gcc flavours are desktop_gcc / server_gcc (--without desktop_gcc).
+# Flavour strings in the build remain desktop-gcc / server-gcc.
+# Defaults match the previous per-arch list (LoongArch has no gcc yet).
+%bcond_without desktop
+%bcond_without server
 %ifarch %{loongarch64}
-%define kernel_flavours desktop server
+%bcond_with desktop_gcc
+%bcond_with server_gcc
 %else
-%define kernel_flavours desktop server desktop-gcc server-gcc
+%bcond_without desktop_gcc
+%bcond_without server_gcc
 %endif
-# possible options are: desktop server desktop-gcc server-gcc
-#define kernel_flavours desktop server desktop-gcc server-gcc
+%if %{with desktop}
+%global kf_desktop desktop
+%endif
+%if %{with server}
+%global kf_server server
+%endif
+%if %{with desktop_gcc}
+%global kf_desktop_gcc desktop-gcc
+%endif
+%if %{with server_gcc}
+%global kf_server_gcc server-gcc
+%endif
+%define kernel_flavours %{?kf_desktop} %{?kf_server} %{?kf_desktop_gcc} %{?kf_server_gcc}
 
 # Rarely used modules → separate kernel-*-modules-* subpackages (see install loop).
 # Token forms:
@@ -233,7 +250,7 @@
 Summary:	Linux kernel built for %{distribution}
 Name:		kernel%{?relc:-rc}
 Version:	%{kernelversion}.%{patchlevel}%{?sublevel:.%{sublevel}}
-Release:	%{?relc:0.rc%{relc}.}1
+Release:	%{?relc:0.rc%{relc}.}2
 License:	GPL-2.0
 Group:		System/Kernel and hardware
 ExclusiveArch:	%{ix86} %{x86_64} %{armx} %{riscv} %{loongarch64}
