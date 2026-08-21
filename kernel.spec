@@ -250,7 +250,7 @@
 Summary:	Linux kernel built for %{distribution}
 Name:		kernel%{?relc:-rc}
 Version:	%{kernelversion}.%{patchlevel}%{?sublevel:.%{sublevel}}
-Release:	%{?relc:0.rc%{relc}.}2
+Release:	%{?relc:0.rc%{relc}.}3
 License:	GPL-2.0
 Group:		System/Kernel and hardware
 ExclusiveArch:	%{ix86} %{x86_64} %{armx} %{riscv} %{loongarch64}
@@ -1697,6 +1697,19 @@ SaveDevel() {
 	cd $TempDevelRoot >/dev/null
 	%make_build V=0 VERBOSE=0 ARCH=%{target_arch} clean
 	cd - >/dev/null
+
+%if %{cross_compiling}
+	# make clean keeps hostprogs so out-of-tree modules can build.
+	# Those were compiled with HOSTCC and must not ship in a target
+	# kernel-devel RPM. Sources stay; rebuild on the target with
+	# "make scripts". find+read exits 1 at EOF; keep set -e happy.
+	find $TempDevelRoot -type f -exec sh -c '
+		for r do
+			[ "$(od -An -N4 -tx1 "$r" 2>/dev/null | tr -d " ")" = "7f454c46" ] && rm -f "$r"
+		done
+		exit 0
+	' sh {} +
+%endif
 
 	rm -f $TempDevelRoot/.config.old
 
