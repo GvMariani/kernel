@@ -51,13 +51,13 @@
 # Flavour strings in the build remain desktop-gcc / server-gcc.
 # Defaults match the previous per-arch list (LoongArch has no gcc yet).
 %bcond_without desktop
-%bcond_without server
+%bcond_with server
 %ifarch %{loongarch64}
 %bcond_with desktop_gcc
 %bcond_with server_gcc
 %else
-%bcond_without desktop_gcc
-%bcond_without server_gcc
+%bcond_with desktop_gcc
+%bcond_with server_gcc
 %endif
 %if %{with desktop}
 %global kf_desktop desktop
@@ -209,7 +209,7 @@
 
 %bcond_without build_source
 %bcond_without build_devel
-%bcond_without cross_headers
+%bcond_with cross_headers
 
 %bcond_with build_debug
 %bcond_without evdi
@@ -237,7 +237,7 @@
 # cpupower is currently x86 only
 %bcond_with build_cpupower
 %endif
-%bcond_without nvidia
+%bcond_with nvidia
 
 # End of user definitions
 
